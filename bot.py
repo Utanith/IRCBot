@@ -11,7 +11,7 @@ help_text = [
         [ "password <password>", "Changes your password to <password>"]
 ]
 
-commands
+database = "docbot.sql"
 
 field_specs = {
 "age": "{u} is {d} years old.",
@@ -21,7 +21,7 @@ field_specs = {
 admin = ["Utanith", "seanc", "LeoNerd", "Dragon"]
 
 def reload_specs():
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""SELECT * FROM specs""")
   res = cur.fetchall()
@@ -31,7 +31,7 @@ def reload_specs():
     field_specs[s[0]] = s[1]
 
 def db_init():
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute('CREATE TABLE IF NOT EXISTS users(nick TEXT PRIMARY KEY, password TEXT)')
   cur.execute('CREATE TABLE IF NOT EXISTS fields(user INT, field TEXT, data TEXT)')
@@ -40,7 +40,7 @@ def db_init():
   con.close()
 
 def add_spec(field, spec):
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""INSERT INTO specs VALUES(?, ?)""", (field, spec))
   reload_specs()
@@ -50,7 +50,7 @@ def add_spec(field, spec):
 
 def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""SELECT * FROM users WHERE nick = ? and password = ?""", (nick, phash))
   if cur.fetchone() is not None:
@@ -60,7 +60,7 @@ def check_password(nick, pw):
   return False
 
 def getUID(nick):
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""SELECT rowid FROM users WHERE nick = ?""", (nick,))
   u = cur.fetchone()
@@ -72,7 +72,7 @@ def getUID(nick):
 
 def update_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick,))
   r = cur.fetchone()
@@ -83,7 +83,7 @@ def update_password(nick, pw):
   return True 
 
 def has_password(nick):
-  con = sql.connect('docbot.sql') 
+  con = sql.connect(database) 
   cur = con.cursor() 
   cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick,))
   u = cur.fetchone()
@@ -94,7 +94,7 @@ def has_password(nick):
   return False
 
 def add_field(nick, field, data):
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   uid = getUID(nick)
 
@@ -114,7 +114,7 @@ def add_field(nick, field, data):
   return True
 
 def get_all_fields(nick):
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   uid = getUID(nick)
 
@@ -124,7 +124,7 @@ def get_all_fields(nick):
   return fields
 
 def get_field(nick, field):
-  con = sql.connect('docbot.sql')
+  con = sql.connect(database)
   cur = con.cursor()
   uid = getUID(nick) 
 
@@ -279,7 +279,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
 def main():
   import sys
   if len(sys.argv) != 4:
-    print("Usage: docbot <server[:port]> <channel> <nickname>")
+    print("Usage: docbot <server[:port]> <channel> <nickname> <database>")
     sys.exit(1)
 
   s = sys.argv[1].split(":", 1)
@@ -294,6 +294,7 @@ def main():
     port = 6697
   chan = sys.argv[2]
   nick = sys.argv[3]
+  database = sys.argv[4]
   
   bot = DocBot(chan, nick, server, port)
   bot.start()
