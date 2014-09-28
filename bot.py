@@ -176,17 +176,17 @@ class DocBot(irc.bot.SingleServerIRCBot):
     return
 
   def on_part(self, c, e):
-    if({e.source.nick, e.source.host} in self.auth):
+    if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} parted channel; destroying auth".format(u=e.source.nick))
 
   def on_disconnect(self, c, e):
-    if({e.source.nick, e.source.host} in self.auth):
+    if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} disconnected; destroying auth".format(u=e.source.nick))
 
   def on_nick(self, c, e):
-    if({e.source.nick, e.source.host} in self.auth):
+    if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} changed nick; destroying auth".format(u=e.source.nick))
 
