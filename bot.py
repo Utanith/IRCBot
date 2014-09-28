@@ -139,6 +139,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nick, "Owned by Utanith")
     self.channel = chan
     self.auth = []
+    self.server = server
 
   def on_nicknameinuse(self, c, e):
     c.nick(c.get_nickname() + "_")
@@ -176,16 +177,22 @@ class DocBot(irc.bot.SingleServerIRCBot):
     return
 
   def on_part(self, c, e):
+    if e.source == self.server:
+      return
     if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} parted channel; destroying auth".format(u=e.source.nick))
 
   def on_disconnect(self, c, e):
+    if e.source == self.server:
+      return
     if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} disconnected; destroying auth".format(u=e.source.nick))
 
   def on_nick(self, c, e):
+    if e.source == self.server:
+      return
     if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} changed nick; destroying auth".format(u=e.source.nick))
@@ -278,7 +285,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
       
 def main():
   import sys
-  if len(sys.argv) != 4:
+  if len(sys.argv) != 5:
     print("Usage: docbot <server[:port]> <channel> <nickname> <database>")
     sys.exit(1)
 
