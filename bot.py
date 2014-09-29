@@ -243,11 +243,11 @@ class DocBot(irc.bot.SingleServerIRCBot):
       if len(args) == 1:
         fields = get_all_fields(args[0])
 
-        if fields == None:
+        if fields == None or fields == []:
           c.privmsg(target, "User has no fields defined.")
           return
         fields = zip(*fields)
-        
+        print(fields)
         flist = ""
         for f in fields[0]:
           if flist == "":
