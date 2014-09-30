@@ -262,7 +262,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     print(e.arguments[0])
     self.do_command(e)
     if "help" in e.arguments[0].split(" "):
-      c.privmsg(e.source.nick, "I keep track of various snippets of information about users. All commands can be used in private message or in a channel. Commds:")
+      c.privmsg(e.source.nick, "I keep track of various snippets of information about users. All commands can be used in private message or in a channel. Commands:")
       for h in help_text:
         c.privmsg(e.source.nick, "!{c:25} | {t}".format(c = h[0], t = h[1]))
 
@@ -272,7 +272,6 @@ class DocBot(irc.bot.SingleServerIRCBot):
   def on_pubmsg(self, c, e):
     msg = e.arguments[0]
     command = msg[1:]
-    print(command)
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e.source, e.arguments[0])
       #self.do_command(e)
