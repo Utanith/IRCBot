@@ -19,7 +19,7 @@ field_specs = {
 }
 
 admins = ["Utanith", "seanc", "LeoNerd", "Dragon"]
-admin = ["addspec"]
+admin = ["addspec", "pwreset"]
 
 def reload_specs():
   con = sql.connect(database)
@@ -79,6 +79,8 @@ def update_password(nick, pw):
   r = cur.fetchone()
   if r is None:
     cur.execute("""INSERT INTO users VALUES (?, ?)""", (nick, phash))
+  else:
+    cur.execute("""UPDATE users SET password = ? WHERE nick = ?""", (phash, nick))
   con.commit()
   con.close()
   return True 
@@ -136,25 +138,47 @@ def get_field(nick, field):
 
 
 class DocBot(irc.bot.SingleServerIRCBot):
-  def authorized(self, nick, action):
+  def __init__(self, chan, nick, server, port=6697):
+    irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nick, "Owned by Utanith")
+    self.channel = chan
+    self.auth = []
+    self.server = server
+    self.commands = {
+    "addfield": self.addfield,
+    "login": self.login,
+    "check": self.check_auth,
+    "logout": self.deauth,
+    "fields": self.fields,
+    "password": self.set_password,
+    "pwreset": self.reset_password,
+    "addspec": self.add_spec
+    }
+
+  def authorized(self, nick, action = "-"):
+    print(self.auth)
     if {nick.nick, nick.host} in self.auth:
       if action in admin and nick.nick in admins:
+        print("Authorized {u} for admin level commands.".format(u=nick.nick))
         return True
-      else:
+      elif action in admin:
+        print("User {u} not authorized for admin level commands.".format(u=nick.nick))
         return False
+      print("Authorized {u} for user level commands.".format(u=nick.nick))
       return True
+    print("User {u} not authorized.".format(u=nick.nick))
     return False
 
-  def addfield(self, source, args):
+  def addfield(self, source, args = ""):
     if self.authorized(source, "addfield"):
-      field = args[1].split(" ", 1)
+      field = args.split(" ", 1)
+      print(field)
       nick = source.nick
       if add_field(source.nick, field[0], field[1]):
         self.connection.privmsg(nick, "Successfully added field {f} with data {d}.".format(f = field[0], d = field[1]))
       else:
         self.connection.privmsg(nick, "Unable to add field.")
 
-  def auth(self, source, args):
+  def login(self, source, args = ""):
     pw = args.split(" ", 1)[1]
     nick = source.nick
     c = self.connection
@@ -162,26 +186,27 @@ class DocBot(irc.bot.SingleServerIRCBot):
       c.privmsg(nick, "You must use your password to log in.")
     elif check_password(nick, pw):
       self.auth.append({nick, source.host})
+      print(self.auth)
       c.privmsg(nick, "Successfully logged in.")
     else:
       c.privmsg(nick, "Unable to log in.")
 
-  def check_auth(self, source, args):
-    if authorized(source, "-"):
+  def check_auth(self, source, args = ""):
+    if self.authorized(source, "-"):
       self.connection.privmsg(source.nick, "You are logged in.")
     else:
       self.connection.privmsg(source.nick, "You are not logged in.")
 
-  def deauth(self, source, args):
-    if authorized(source, "-"):
+  def deauth(self, source, args = ""):
+    if self.authorized(source, "-"):
       self.auth.remove({source.nick, source.host})
       self.connection.privmsg(source.nick, "You have logged out.")
     else:
       self.connection.privmsg(source.nick, "You aren't logged in.")
 
-  def fields(self, source, args):
+  def fields(self, source, args = ""):
     argv = args.split(" ")
-    args = msg[1].split(" ")
+    #args = msg[1].split(" ")
     if len(argv) == 1:
       fields = get_all_fields(argv[0])
 
@@ -199,6 +224,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
       c.privmsg(target, "{u} has these fields: {f}".format(u = args[0], f = flist))
     elif len(argv) == 2:
       field = get_field(argv[0], argv[1])
+      if field is None:
+        c.privmsg(target, "No field {f} defined.".format(f=argv[1]))
       field = field[0]
       if argv[1].lower() in field_specs and not field[0] == '!':
         c.privmsg(target, field_specs[argv[1].lower()].format(u = argv[0], f = argv[1], d = field))
@@ -206,16 +233,28 @@ class DocBot(irc.bot.SingleServerIRCBot):
         c.privmsg(target, "{u} has defined {f} as {d}".format(u = argv[0], f = argv[1], d = field))
       else:
         c.privmsg(target, argv[1] + ": " + field[1:]) 
-  
-  def set_password(self, source, args):
-    if check_auth(source, "set_password") or has_password(source.nick):
+
+  def set_password(self, source, args = ""):
+    if self.authorized(source, "set_password") or not has_password(source.nick):
       if update_password(source.nick, args[1]):
         self.connection.privmsg(source.nick, "Password changed.")
       else:
         self.connection.privmsg(source.nick, "Unable to update password.")
+    else:
+      self.connection.privmsg(source.nick, "You must login to change your password.")
 
-  def add_spec(self, source, args):
-    if check_auth(source, "addspec"):
+  def reset_password(self, source, args = ""):
+    if self.authorized(source, "reset_password"):
+      args = args.split(" ", 2)
+      user = args[1]
+      password = args[2]
+      if update_password(user, password):
+        self.connection.privmsg(source.nick, "Password changed.")
+      else:
+        self.connection.privmsg(source.nick, "Unable to change password.")
+
+  def add_spec(self, source, args = ""):
+    if self.authorized(source, "addspec"):
       if len(args.split(" ")) < 2:
         self.connection.privmsg(source.nick, "Not enough arguments.")
       else:
@@ -224,22 +263,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
         field_spec = field[1]
         field = field[0]
         add_spec(field, field_spec)
-        self.connection.privmsg(source.nick, "Added {s} spec for {f}.".format(s = field_spec, f = field)
-
-  def __init__(self, chan, nick, server, port=6697):
-    irc.bot.SingleServerIRCBot.__init__(self, [(server, port)], nick, "Owned by Utanith")
-    self.channel = chan
-    self.auth = []
-    self.server = server
-    self.commands = {
-    "addfield": self.addfield,
-    "auth": self.auth,
-    "check": self.check_auth,
-    "deauth": self.deauth,
-    "fields": self.fields,
-    "password": self.set_password,
-    "addspec": self.add_spec
-    }
+        self.connection.privmsg(source.nick, "Added {s} spec for {f}.".format(s = field_spec, f = field))
 
   def on_nicknameinuse(self, c, e):
     c.nick(c.get_nickname() + "_")
@@ -271,7 +295,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
   
   def on_pubmsg(self, c, e):
     msg = e.arguments[0]
-    command = msg[1:]
+    argv = msg.split(" ", 1)
+    command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e.source, e.arguments[0])
       #self.do_command(e)
