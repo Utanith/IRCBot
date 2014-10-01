@@ -4,6 +4,7 @@ from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
 help_text = [
         [ "addfield <field> <data>", "Sets <field> to <data>"],
+        #[ "chart <nick>", "Shows a set of fields defined in the field `chart`"],
         [ "check", "Tells you whether you're logged in or not."],
         [ "delfield [nick] <field>", "Removes <field> from yourself, if no nick is specified."],
         [ "describe <nick>", "Shortcut for `!fields <user> description`"],
@@ -47,9 +48,9 @@ def add_spec(field, spec):
   con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""INSERT INTO specs VALUES(?, ?)""", (field, spec))
-  reload_specs()
   con.commit()
   con.close()
+  reload_specs()
 
 def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
@@ -80,7 +81,7 @@ def update_password(nick, pw):
   cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick.lower(),))
   r = cur.fetchone()
   if r is None:
-    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nicki.lower(), phash))
+    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nick.lower(), phash))
   else:
     cur.execute("""UPDATE users SET password = ? WHERE nick = ?""", (phash, nick.lower()))
   con.commit()
@@ -157,15 +158,16 @@ class DocBot(irc.bot.SingleServerIRCBot):
     self.server = server
     self.commands = {
     "addfield": self.addfield,
-    "login": self.login,
-    "check": self.check_auth,
-    "describe": self.describe,
+    "addspec":  self.add_spec,
+    #"chart":    self.chart,
+    "check":    self.check_auth,
     "delfield": self.delfield,
-    "logout": self.deauth,
-    "fields": self.fields,
+    "describe": self.describe,
+    "fields":   self.fields,
+    "login":    self.login,
+    "logout":   self.deauth,
     "password": self.set_password,
-    "pwreset": self.reset_password,
-    "addspec": self.add_spec
+    "pwreset":  self.reset_password,
     }
 
   def authorized(self, e, action = "-"):
@@ -192,6 +194,36 @@ class DocBot(irc.bot.SingleServerIRCBot):
         self.command_reply(e, "Successfully added field {f} with data {d}.".format(f = field[1], d = field[2]))
       else:
         self.command_reply(e, "Unable to add field.")
+
+  def chart(self, e, args = ""):
+    args = args.split(" ")
+    user = args[1]
+    height = get_field(user, "height")
+    weight = get_field(user, "weight")
+    btype = get_field(user, "bodytype")
+    pcolor = get_field(user, "primarycolor")
+    scolor = get_field(user, "secondarycolor")
+
+    output = """{n}: Height: {h}, weight: {w}, body: {b},
+              primary color: {p}, secondary color: {s}.""".format(n = user, h = height[0],
+              w = weight[0], b = btype[0], p = pcolor[0], s = scolor[0])
+    self.command_reply(e, output)
+
+  def metafield(self, e, args = ""):
+    args = args.split(" ")
+    user = args[1]
+    metafield = args[2]
+    items = self.field_text(user, metafield)
+    items = items.split(",")
+
+    output = ""
+    for s in items:
+      field = get_field(user, s)
+      if output == "":
+        output = field[0]
+      else:
+        output = output + ", " + field[0]
+    self.command_reply(e, output)
 
   def delfield(self, e, args = ""):
     args = e.arguments[0].split(" ")
