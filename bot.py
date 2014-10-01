@@ -47,9 +47,9 @@ def add_spec(field, spec):
   con = sql.connect(database)
   cur = con.cursor()
   cur.execute("""INSERT INTO specs VALUES(?, ?)""", (field, spec))
-  reload_specs()
   con.commit()
   con.close()
+  reload_specs()
 
 def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
@@ -80,7 +80,7 @@ def update_password(nick, pw):
   cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick.lower(),))
   r = cur.fetchone()
   if r is None:
-    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nicki.lower(), phash))
+    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nick.lower(), phash))
   else:
     cur.execute("""UPDATE users SET password = ? WHERE nick = ?""", (phash, nick.lower()))
   con.commit()
