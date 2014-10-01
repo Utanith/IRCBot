@@ -4,11 +4,12 @@ from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
 help_text = [
         [ "addfield <field> <data>", "Sets <field> to <data>"],
-        [ "login <password>", "Authorizes you to use !addfield (And !password if you've set one)"],
-        [ "check", "Tells you whether you're logged in or not.]"],
-        [ "describe <user>", "Shortcut for `!fields <user> description`"],
-        [ "logout", "Logs you out"],
+        [ "check", "Tells you whether you're logged in or not."],
+        [ "delfield [nick] <field>", "Removes <field> from yourself, if no nick is specified."],
+        [ "describe <nick>", "Shortcut for `!fields <user> description`"],
         [ "fields <nick> [field]", "Lists <nick>'s fields, or show the value of [field] for <nick>"],
+        [ "login <password>", "Authorizes you to use !addfield (And !password if you've set one)"],
+        [ "logout", "Logs you out"],
         [ "password <password>", "Changes your password to <password>"]
 ]
 
@@ -20,7 +21,7 @@ field_specs = {
 }
 
 admins = ["Utanith", "seanc", "LeoNerd", "Dragon"]
-admin = ["addspec", "pwreset"]
+admin = ["addspec", "pwreset", "admindel"]
 
 def reload_specs():
   con = sql.connect(database)
@@ -54,7 +55,7 @@ def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
   con = sql.connect(database)
   cur = con.cursor()
-  cur.execute("""SELECT * FROM users WHERE nick = ? and password = ?""", (nick, phash))
+  cur.execute("""SELECT * FROM users WHERE nick = ? and password = ?""", (nick.lower(), phash))
   if cur.fetchone() is not None:
     con.close()
     return True
@@ -64,7 +65,7 @@ def check_password(nick, pw):
 def getUID(nick):
   con = sql.connect(database)
   cur = con.cursor()
-  cur.execute("""SELECT rowid FROM users WHERE nick = ?""", (nick,))
+  cur.execute("""SELECT rowid FROM users WHERE nick = ?""", (nick.lower(),))
   u = cur.fetchone()
   con.close()
   if u is None:
@@ -76,12 +77,12 @@ def update_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
   con = sql.connect(database)
   cur = con.cursor()
-  cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick,))
+  cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick.lower(),))
   r = cur.fetchone()
   if r is None:
-    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nick, phash))
+    cur.execute("""INSERT INTO users VALUES (?, ?)""", (nicki.lower(), phash))
   else:
-    cur.execute("""UPDATE users SET password = ? WHERE nick = ?""", (phash, nick))
+    cur.execute("""UPDATE users SET password = ? WHERE nick = ?""", (phash, nick.lower()))
   con.commit()
   con.close()
   return True 
@@ -89,7 +90,7 @@ def update_password(nick, pw):
 def has_password(nick):
   con = sql.connect(database) 
   cur = con.cursor() 
-  cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick,))
+  cur.execute("""SELECT * FROM users WHERE nick = ?""", (nick.lower(),))
   u = cur.fetchone()
   con.close()
   if u is not None:
@@ -110,9 +111,19 @@ def add_field(nick, field, data):
 
   cur.execute("""SELECT * FROM fields WHERE user = ? AND field = ?""", (uid, field))
   if cur.fetchone() is None:
-    cur.execute("""INSERT INTO fields VALUES(?,?,?)""", (uid, field, data))
+    cur.execute("""INSERT INTO fields VALUES(?,?,?)""", (uid, field.lower(), data))
   else:
-    cur.execute("""UPDATE fields SET data = ? WHERE user = ? AND field = ?""", (data, uid, field))
+    cur.execute("""UPDATE fields SET data = ? WHERE user = ? AND field = ?""", (data, uid, field.lower()))
+  con.commit()
+  con.close()
+  return True
+
+def del_field(nick, field):
+  con = sql.connect(database)
+  cur = con.cursor()
+  uid = getUID(nick) 
+
+  cur.execute("""DELETE FROM fields WHERE user = ? AND field = ?""", (uid, field))
   con.commit()
   con.close()
   return True
@@ -149,6 +160,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     "login": self.login,
     "check": self.check_auth,
     "describe": self.describe,
+    "delfield": self.delfield,
     "logout": self.deauth,
     "fields": self.fields,
     "password": self.set_password,
@@ -180,6 +192,20 @@ class DocBot(irc.bot.SingleServerIRCBot):
         self.command_reply(e, "Successfully added field {f} with data {d}.".format(f = field[1], d = field[2]))
       else:
         self.command_reply(e, "Unable to add field.")
+
+  def delfield(self, e, args = ""):
+    args = e.arguments[0].split(" ")
+    if len(args) == 2 and self.authorized(e, "userdel"):
+      #Assume user is target
+      if del_field(e.source.nick, args[1]):
+        self.command_reply(e, "Successfully delete field {f}.".format(f = args[1]))
+      else:
+        self.command_reply(e, "Unable to delete field {f}; perhaps it doesn't exist?".format(f = args[1]))
+    elif len(args) == 3 and self.authorized(e, "admindel"):
+      if del_field(args[1], args[2]):
+        self.command_reply(e, "Successfully deleted field {f} on nick {n}.".format(f = args[2], n = args[1]))
+      else:
+        self.command_reply(e, "Unable to delete field {f} on nick {n}.".format(f = args[2], n = args[1]))
 
   def login(self, e, args = ""):
     source = e.source 
