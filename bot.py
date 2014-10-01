@@ -29,7 +29,8 @@ def reload_specs():
   con.close()
 
   for s in res:
-    field_specs[s[0]] = s[1]
+    print("Adding spec {s} for key {k}.".format(s=s[1], k=s[0].lower()))
+    field_specs[s[0].lower()] = s[1]
 
 def db_init():
   con = sql.connect(database)
@@ -47,7 +48,6 @@ def add_spec(field, spec):
   reload_specs()
   con.commit()
   con.close()
-  print(field_specs)
 
 def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
@@ -147,6 +147,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     "addfield": self.addfield,
     "login": self.login,
     "check": self.check_auth,
+    "describe": self.describe,
     "logout": self.deauth,
     "fields": self.fields,
     "password": self.set_password,
@@ -154,8 +155,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
     "addspec": self.add_spec
     }
 
-  def authorized(self, nick, action = "-"):
-    print(self.auth)
+  def authorized(self, e, action = "-"):
+    nick = e.source
     if {nick.nick, nick.host} in self.auth:
       if action in admin and nick.nick in admins:
         print("Authorized {u} for admin level commands.".format(u=nick.nick))
@@ -168,102 +169,129 @@ class DocBot(irc.bot.SingleServerIRCBot):
     print("User {u} not authorized.".format(u=nick.nick))
     return False
 
-  def addfield(self, source, args = ""):
-    if self.authorized(source, "addfield"):
-      field = args.split(" ", 1)
-      print(field)
+  def addfield(self, e, args = ""):
+    source = e.source
+    args = e.arguments[0]
+    if self.authorized(e, "addfield"):
+      field = args.split(" ", 2)
       nick = source.nick
-      if add_field(source.nick, field[0], field[1]):
-        self.connection.privmsg(nick, "Successfully added field {f} with data {d}.".format(f = field[0], d = field[1]))
+      if add_field(nick, field[1], field[2]):
+        self.command_reply(e, "Successfully added field {f} with data {d}.".format(f = field[1], d = field[2]))
       else:
-        self.connection.privmsg(nick, "Unable to add field.")
+        self.command_reply(e, "Unable to add field.")
 
-  def login(self, source, args = ""):
+  def login(self, e, args = ""):
+    source = e.source 
+    args = e.arguments[0]
     pw = args.split(" ", 1)[1]
     nick = source.nick
-    c = self.connection
     if len(pw) < 1:
-      c.privmsg(nick, "You must use your password to log in.")
+      self.command_reply(e, "You must use your password to log in.")
     elif check_password(nick, pw):
       self.auth.append({nick, source.host})
-      print(self.auth)
-      c.privmsg(nick, "Successfully logged in.")
+      self.command_reply(e, "Successfully logged in.")
     else:
-      c.privmsg(nick, "Unable to log in.")
+      self.command_reply(e, "Unable to log in.")
 
-  def check_auth(self, source, args = ""):
-    if self.authorized(source, "-"):
-      self.connection.privmsg(source.nick, "You are logged in.")
+  def check_auth(self, e, args = ""): 
+    args = e.arguments[0]
+    if self.authorized(e, "-"):
+      self.command_reply(e, "You are logged in.")
     else:
-      self.connection.privmsg(source.nick, "You are not logged in.")
+      self.command_reply(e, "You are not logged in.")
 
-  def deauth(self, source, args = ""):
-    if self.authorized(source, "-"):
+  def describe(self, e, args = ""):
+    e.arguments[0] = "!fields {u} description".format(u = e.arguments[0].split(" ")[1])
+    self.fields(e)
+
+  def deauth(self, e, args = ""):
+    source = e.source 
+    args = e.arguments[0]
+    if self.authorized(e, "-"):
       self.auth.remove({source.nick, source.host})
-      self.connection.privmsg(source.nick, "You have logged out.")
+      self.command_reply(e, "You have logged out.")
     else:
-      self.connection.privmsg(source.nick, "You aren't logged in.")
+      self.command_reply(e, "You aren't logged in.")
 
-  def fields(self, source, args = ""):
+  def fields(self, e, args = ""):
+    source = e.source 
+    args = e.arguments[0]
     argv = args.split(" ")
-    #args = msg[1].split(" ")
-    if len(argv) == 1:
-      fields = get_all_fields(argv[0])
+    if len(argv) == 2:
+      fields = get_all_fields(argv[1])
 
       if fields == None or fields == []:
-        c.privmsg(target, "User has no fields defined.")
+        self.command_reply(e, "User has no fields defined.")
         return
       fields = zip(*fields)
-      print(fields)
       flist = ""
       for f in fields[0]:
         if flist == "":
           flist = f
         else:
           flist = flist + ", " + f
-      c.privmsg(target, "{u} has these fields: {f}".format(u = args[0], f = flist))
-    elif len(argv) == 2:
-      field = get_field(argv[0], argv[1])
-      if field is None:
-        c.privmsg(target, "No field {f} defined.".format(f=argv[1]))
-      field = field[0]
-      if argv[1].lower() in field_specs and not field[0] == '!':
-        c.privmsg(target, field_specs[argv[1].lower()].format(u = argv[0], f = argv[1], d = field))
-      elif not field[0] == '!':
-        c.privmsg(target, "{u} has defined {f} as {d}".format(u = argv[0], f = argv[1], d = field))
+      self.command_reply(e, "{u} has these fields: {f}".format(u = argv[1], f = flist))
+    elif len(argv) == 3:
+      output = self.field_text(argv[1], argv[2])
+      if output == "":
+        self.command_reply(e, "{u} doesn't have a {f}.".format(u = argv[1], f = argv[2]))
       else:
-        c.privmsg(target, argv[1] + ": " + field[1:]) 
-
-  def set_password(self, source, args = ""):
-    if self.authorized(source, "set_password") or not has_password(source.nick):
+        self.command_reply(e, output)
+      
+  def set_password(self, e, args = ""):
+    source = e.source 
+    args = e.arguments[0].split(" ", 1)
+    if self.authorized(e, "set_password") or not has_password(source.nick):
       if update_password(source.nick, args[1]):
-        self.connection.privmsg(source.nick, "Password changed.")
+        self.command_reply(e, "Password changed.")
       else:
-        self.connection.privmsg(source.nick, "Unable to update password.")
+        self.command_reply(e, "Unable to update password.")
     else:
-      self.connection.privmsg(source.nick, "You must login to change your password.")
+      self.command_reply(e, "You must login to change your password.")
 
-  def reset_password(self, source, args = ""):
-    if self.authorized(source, "reset_password"):
+  def reset_password(self, e, args = ""):
+    source = e.source 
+    args = e.arguments[0]
+    if self.authorized(e, "reset_password"):
       args = args.split(" ", 2)
       user = args[1]
       password = args[2]
       if update_password(user, password):
-        self.connection.privmsg(source.nick, "Password changed.")
+        self.command_reply(e, "Password changed.")
       else:
-        self.connection.privmsg(source.nick, "Unable to change password.")
+        self.command_reply(e, "Unable to change password.")
 
-  def add_spec(self, source, args = ""):
-    if self.authorized(source, "addspec"):
+  def add_spec(self, e, args = ""):
+    args = e.arguments[0]
+    if self.authorized(e, "addspec"):
       if len(args.split(" ")) < 2:
-        self.connection.privmsg(source.nick, "Not enough arguments.")
+        self.command_reply(e, "Not enough arguments.")
       else:
-        argv = args.split(" ", 1)
-        field = argv.split(" ", 1)
-        field_spec = field[1]
-        field = field[0]
+        argv = args.split(" ", 2)
+        field = argv[1]
+        field_spec = argv[2]
         add_spec(field, field_spec)
-        self.connection.privmsg(source.nick, "Added {s} spec for {f}.".format(s = field_spec, f = field))
+        self.command_reply(e, "Added {s} spec for {f}.".format(s = field_spec, f = field))
+
+  def command_reply(self, source, msg):
+    c = self.connection
+    target = source.target
+    if target == c.get_nickname():
+      target = source.nick
+    c.privmsg(target, msg)
+
+  def field_text(self, user, field):
+    data = get_field(user, field)
+    if data is None:
+     return ""
+
+    data = data[0]
+    if field.lower() in field_specs and not data[0] == '!':
+     return field_specs[field.lower()].format(u = user, f = field, d = data)
+    elif not field[0] == '!':
+     return "{u} has defined {f} as {d}".format(u = user, f = field, d = data)
+    else:
+     return field + ": " + data[1:]
 
   def on_nicknameinuse(self, c, e):
     c.nick(c.get_nickname() + "_")
@@ -283,8 +311,13 @@ class DocBot(irc.bot.SingleServerIRCBot):
     c.mode(c.get_nickname(), "+B")
 
   def on_privmsg(self, c, e):
-    print(e.arguments[0])
-    self.do_command(e)
+    #print(e.target)
+    msg = e.arguments[0]
+    argv = msg.split(" ", 1)
+    command = argv[0][1:]
+    if(msg[0] == "!" and command in self.commands):
+      self.commands[command](e)
+      return
     if "help" in e.arguments[0].split(" "):
       c.privmsg(e.source.nick, "I keep track of various snippets of information about users. All commands can be used in private message or in a channel. Commands:")
       for h in help_text:
@@ -298,7 +331,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     argv = msg.split(" ", 1)
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
-      self.commands[command](e.source, e.arguments[0])
+      self.commands[command](e)
       #self.do_command(e)
     return
 
@@ -322,92 +355,6 @@ class DocBot(irc.bot.SingleServerIRCBot):
     if {e.source.nick, e.source.host} in self.auth:
       self.auth.remove({e.source.nick, e.source.host})
       print("User {u} changed nick; destroying auth".format(u=e.source.nick))
-
-  def do_command(self, e):
-    nick = e.source.nick
-    c = self.connection
-    target = nick if e.target == c.get_nickname() else e.target   
-    msg = e.arguments[0].split(" ", 1)
-    
-    authorized = True if {nick, e.source.host} in self.auth else False
-
-    if msg[0] == "!auth" and len(msg) == 2:
-      if check_password(nick, msg[1]):
-        self.auth.append({nick, e.source.host})
-        c.privmsg(target, "Successfully logged in.")
-      else:
-        c.privmsg(target, "Unable to log in.")
-
-    elif msg[0] == "!check":
-      if authorized:
-        c.privmsg(target, "You are authorized.")
-      else:
-        c.privmsg(target, "You are not authorized.")
-
-    elif msg[0] == "!deauth":
-      if authorized:
-        self.auth.remove({nick, e.source.host})
-        c.privmsg(target, "You have logged out.")
-
-    elif msg[0] == "!password":
-      if authorized or not has_password(nick):
-        if update_password(nick, msg[1]):
-          c.privmsg(target, "Password changed.")
-      else:
-        c.privmsg(target, "You must !auth to change your password.")
-
-    elif msg[0] == "!addfield":
-      if authorized:
-        field = msg[1].split(" ", 1)
-        if add_field(nick, field[0], field[1]):
-          c.privmsg(target, "Successfully added field {f} with data {d}.".format(f = field[0], d = field[1]))
-        else:
-          c.privmsg(target, "Unable to add field.")
-    
-    elif msg[0] == "!fields":
-      args = msg[1].split(" ")
-      if len(args) == 1:
-        fields = get_all_fields(args[0])
-
-        if fields == None or fields == []:
-          c.privmsg(target, "User has no fields defined.")
-          return
-        fields = zip(*fields)
-        print(fields)
-        flist = ""
-        for f in fields[0]:
-          if flist == "":
-            flist = f
-          else:
-            flist = flist + ", " + f
-        c.privmsg(target, "{u} has these fields: {f}".format(u = args[0], f = flist))
-      elif len(args) == 2:
-        field = get_field(args[0], args[1])
-        field = field[0]
-        if args[1].lower() in field_specs and not field[0] == '!':
-          c.privmsg(target, field_specs[args[1].lower()].format(u = args[0], f = args[1], d = field))
-        elif not field[0] == '!':
-          c.privmsg(target, "{u} has defined {f} as {d}".format(u = args[0], f = args[1], d = field))
-        else:
-          c.privmsg(target, args[1] + ": " + field[1:])
-
-    elif msg[0] == "!addfield":
-      if authorized:
-        field = msg[1].split(" ", 1)
-        if add_field(nick, field[0], field[1]):
-          c.privmsg(target, "Successfully added field {f} with data {d}.".format(f = field[0], d = field[1]))
-        else:
-          c.privmsg(target, "Unable to add field.")
-
-    elif msg[0] == "!addspec":
-      if authorized and nick in admin and len(msg[1].split(" ")) > 2:
-        field = msg[1].split(" ", 1)
-        field_specs[field[0]] = field[1]
-        add_spec(field[0], field[1])
-        c.privmsg(target, "Added {s} spec for {f}".format(s = field[1], f = field[0]))
-      else:
-        c.privmsg(target, "Unable to add spec.")
-
       
 def main():
   import sys
@@ -434,4 +381,5 @@ def main():
 
 if __name__ == "__main__":
   db_init()
+  reload_specs()
   main()
