@@ -6,6 +6,7 @@ help_text = [
         [ "addfield <field> <data>", "Sets <field> to <data>"],
         [ "auth <password>", "Authorizes you to use !addfield (And !password if you've set one)"],
         [ "check", "Tells you whether you're logged in or not.]"],
+        [ "describe <user>", "Shortcut for `!fields <user> description`"],
         [ "deauth", "Logs you out"],
         [ "fields <nick> [field]", "Lists <nick>'s fields, or show the value of [field] for <nick>"],
         [ "password <password>", "Changes your password to <password>"]
