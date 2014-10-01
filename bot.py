@@ -15,14 +15,20 @@ help_text = [
 
 database = "bot.sql"
 
+# These are default specifications
+# When these fields are output the value here is used as a format.
 field_specs = {
 "age": "{u} is {d} years old.",
 "gender": "{u} is {d}."
 }
 
+# These variables determine who can access admin commands
+# as well as which commands are considered "admin commands"
 admins = ["Utanith", "seanc", "LeoNerd", "Dragon"]
 admin = ["addspec", "pwreset", "admindel"]
 
+# Pull field specifications from the DB and reinsert them to
+# the field_specs variable
 def reload_specs():
   con = sql.connect(database)
   cur = con.cursor()
@@ -34,15 +40,18 @@ def reload_specs():
     print("Adding spec {s} for key {k}.".format(s=s[1], k=s[0].lower()))
     field_specs[s[0].lower()] = s[1]
 
+# Create necessary tables and indexes on the database
 def db_init():
   con = sql.connect(database)
   cur = con.cursor()
   cur.execute('CREATE TABLE IF NOT EXISTS users(nick TEXT PRIMARY KEY, password TEXT)')
   cur.execute('CREATE TABLE IF NOT EXISTS fields(user INT, field TEXT, data TEXT)')
   cur.execute('CREATE TABLE IF NOT EXISTS specs(field TEXT, spec TEXT)')
+  cur.execute('CREATE INDEX IF NOT EXISTS field_name ON fields (field)')
   con.commit()
   con.close()
 
+# Adds a field format to the DB, then reloads the formats in memory
 def add_spec(field, spec):
   con = sql.connect(database)
   cur = con.cursor()
@@ -51,6 +60,8 @@ def add_spec(field, spec):
   con.close()
   reload_specs()
 
+# Hash the submitted password and look for a corresponding user/pass in DB
+# If no match is found, returns false, else true.
 def check_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
   con = sql.connect(database)
@@ -62,6 +73,7 @@ def check_password(nick, pw):
   con.close()
   return False
 
+# Retrieves the rowid for a nick, or None if the nick doesn't exist in DB
 def getUID(nick):
   con = sql.connect(database)
   cur = con.cursor()
@@ -73,6 +85,7 @@ def getUID(nick):
   else: 
     return u[0]
 
+# Change or add a password to a nick
 def update_password(nick, pw):
   phash = hashlib.sha512(pw).hexdigest()
   con = sql.connect(database)
@@ -87,6 +100,7 @@ def update_password(nick, pw):
   con.close()
   return True 
 
+# Checks if the password field in DB is populated
 def has_password(nick):
   con = sql.connect(database) 
   cur = con.cursor() 
@@ -98,6 +112,7 @@ def has_password(nick):
       return True
   return False
 
+# Adds or updates a key-value pair for nick
 def add_field(nick, field, data):
   con = sql.connect(database)
   cur = con.cursor()
@@ -109,6 +124,7 @@ def add_field(nick, field, data):
   if count >= 100:
     return False
 
+  # Decide if we're updating a row or inserting a new one
   cur.execute("""SELECT * FROM fields WHERE user = ? AND field = ?""", (uid, field))
   if cur.fetchone() is None:
     cur.execute("""INSERT INTO fields VALUES(?,?,?)""", (uid, field.lower(), data))
@@ -117,6 +133,7 @@ def add_field(nick, field, data):
   con.commit()
   con.close()
   return True
+
 
 def del_field(nick, field):
   con = sql.connect(database)
@@ -214,6 +231,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
     nick = source.nick
     if len(pw) < 1:
       self.command_reply(e, "You must use your password to log in.")
+    elif self.authorized(e, "-"):
+      self.command_reply(e, "You're already logged in!")
     elif check_password(nick, pw):
       self.auth.append({nick, source.host})
       self.command_reply(e, "Successfully logged in.")
