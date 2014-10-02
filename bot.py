@@ -55,7 +55,7 @@ def db_init():
 def add_spec(field, spec):
   con = sql.connect(database)
   cur = con.cursor()
-  cur.execute("""INSERT INTO specs VALUES(?, ?)""", (field, spec))
+  cur.execute("""INSERT INTO specs VALUES(?, ?)""", (field.lower(), spec))
   con.commit()
   con.close()
   reload_specs()
@@ -125,7 +125,7 @@ def add_field(nick, field, data):
     return False
 
   # Decide if we're updating a row or inserting a new one
-  cur.execute("""SELECT * FROM fields WHERE user = ? AND field = ?""", (uid, field))
+  cur.execute("""SELECT * FROM fields WHERE user = ? AND field = ?""", (uid, field.lower()))
   if cur.fetchone() is None:
     cur.execute("""INSERT INTO fields VALUES(?,?,?)""", (uid, field.lower(), data))
   else:
@@ -140,7 +140,7 @@ def del_field(nick, field):
   cur = con.cursor()
   uid = getUID(nick) 
 
-  cur.execute("""DELETE FROM fields WHERE user = ? AND field = ?""", (uid, field))
+  cur.execute("""DELETE FROM fields WHERE user = ? AND field = ?""", (uid, field.lower()))
   con.commit()
   con.close()
   return True
@@ -160,7 +160,7 @@ def get_field(nick, field):
   cur = con.cursor()
   uid = getUID(nick) 
 
-  cur.execute("""SELECT data FROM fields WHERE user = ? AND field = ?""", (uid,field)) 
+  cur.execute("""SELECT data FROM fields WHERE user = ? AND field = ?""", (uid,field.lower())) 
   fields = cur.fetchone() 
   con.close() 
   return fields
