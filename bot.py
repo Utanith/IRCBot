@@ -1,4 +1,4 @@
-import irc.bot, irc.strings, hashlib, os
+import irc.bot, irc.strings, hashlib, os, re, sys, math
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
@@ -26,8 +26,9 @@ field_specs = {
 
 # These variables determine who can access admin commands
 # as well as which commands are considered "admin commands"
-admins = ["Utanith", "seanc", "LeoNerd", "Dragon"]
-admin = ["addspec", "pwreset", "admindel"]
+super_admin = ["Utanith"]
+admins = ["Utanith", "seanc", "LeoNerd"]
+admin = ["addspec", "pwreset", "admindel", "raw"]
 
 # Pull field specifications from the DB and reinsert them to
 # the field_specs variable
@@ -184,7 +185,9 @@ class DocBot(irc.bot.SingleServerIRCBot):
     "fields": self.fields,
     "password": self.set_password,
     "pwreset": self.reset_password,
-    "addspec": self.add_spec
+    "addspec": self.add_spec,
+    "raw": self.raw,
+    "introduce": self.introduce
     }
 
   def authorized(self, e, action = "-"):
@@ -208,9 +211,9 @@ class DocBot(irc.bot.SingleServerIRCBot):
       field = args.split(" ", 2)
       nick = source.nick
       if add_field(nick, field[1], field[2]):
-        self.command_reply(e, "Successfully added field {f} with data {d}.".format(f = field[1], d = field[2]))
+        self.command_reply(e, "I will remember that your {f} is {d}.".format(f = field[1], d = field[2]))
       else:
-        self.command_reply(e, "Unable to add field.")
+        self.command_reply(e, "I'm sorry, there was a probably storing that information.")
 
   def delfield(self, e, args = ""):
     args = e.arguments[0].split(" ")
@@ -278,7 +281,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
           flist = f
         else:
           flist = flist + ", " + f
-      self.command_reply(e, "{u} has these fields: {f}".format(u = argv[1], f = flist))
+      self.command_reply(e, "Here is what I know about {u}: {f}".format(u = argv[1], f = flist))
     elif len(argv) == 3:
       output = self.field_text(argv[1], argv[2])
       if output == "":
@@ -322,11 +325,19 @@ class DocBot(irc.bot.SingleServerIRCBot):
         self.command_reply(e, "Added {s} spec for {f}.".format(s = field_spec, f = field))
 
   def command_reply(self, source, msg):
+    size = sys.getsizeof(msg)
+    msgs = math.ceil(size / 450.0)
+    
     c = self.connection
     target = source.target
+    
     if target == c.get_nickname():
       target = source.nick
-    c.privmsg(target, msg)
+
+    for x in xrange(int(msgs)):
+      start = 0 + 446*x
+      end = start + 450
+      c.privmsg(target, msg[start:end])
 
   def field_text(self, user, field):
     data = get_field(user, field)
@@ -334,18 +345,26 @@ class DocBot(irc.bot.SingleServerIRCBot):
      return ""
 
     data = data[0]
-    if field.lower() in field_specs and not data[0] == '!':
+    if field.lower() in field_specs:
      return field_specs[field.lower()].format(u = user, f = field, d = data)
-    elif not field[0] == '!':
-     return "{u} has defined {f} as {d}".format(u = user, f = field, d = data)
     else:
-     return field + ": " + data[1:]
+     return "{u}'s {f} is {d}.".format(u = user, f = field, d = data)
+
+  def raw(self, e, args = ""):
+    if e.source.nick in super_admin:
+      c = self.connection
+      msg = e.arguments[0].split(" ", 1)[1]
+      print(msg)
+      c.send_raw(msg)
+
+  def introduce(self, e, args = ""):
+    self.command_reply(e, "Hello! My name is Umbra, and I am an artificial intelligence designed to help with record keeping around the vet's office. I've been integrated into the entire facility, so I'm always around to help you, but I am only allowed to store your name and any information you explicitly tell me to remember. If you're not sure how to use me, you can ask me for help. If I can't resolve your issue, please talk to Utanith - He knows my systems inside and out.")
 
   def on_nicknameinuse(self, c, e):
     c.nick(c.get_nickname() + "_")
 
   def on_error(self, c, e):
-    print(e.arguments[0])
+    pass
 
   def on_myinfo(self, c, e):
     print(e.arguments[0])
@@ -370,13 +389,30 @@ class DocBot(irc.bot.SingleServerIRCBot):
       c.privmsg(e.source.nick, "I keep track of various snippets of information about users. All commands can be used in private message or in a channel. Commands:")
       for h in help_text:
         c.privmsg(e.source.nick, "!{c:25} | {t}".format(c = h[0], t = h[1]))
+      c.privmsg(e.source.nick, "Additionally, I can respond to in character messages falling within a certain format; \"Umbra, <a> is <n>'s <f>?\" where <a> is one of who, what, when, or where. <n> is a nickname, and <f> is the piece of information you want to look up. Similarly, you can save data about yourself with a message like, \"Umbra, remember that my <f> is <d>.\" <f> is the name of the information, and <d> is the information to store. These only work in channel.")
 
   def on_notice(self, c, e):
     pass
   
+  def natural_commands(self, s):
+    m = re.match("""Umbra, (who|what|where|when) is (.*)'s (.*)\?""", s)
+    if m is not None:
+      return "!fields {n} {f}".format(n = m.group(2), f = m.group(3))
+ 
+    m = re.match("""Umbra, remember that my (.*) is (.*).""", s)
+    if m is not None:
+      return "!addfield {f} {d}".format(f = m.group(1), d = m.group(2))
+
+    m = re.match("""Umbra, introduce yourself.""", s)
+    if m is not None:
+      return "!introduce"
+
+    return s
+
   def on_pubmsg(self, c, e):
-    msg = e.arguments[0]
-    argv = msg.split(" ", 1)
+    msg = self.natural_commands(e.arguments[0])
+    argv = msg.split(" ", 1) 
+
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e)
