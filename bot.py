@@ -1,6 +1,8 @@
-import irc.bot, irc.strings, hashlib
+import irc.bot, irc.strings, hashlib, os
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
+
+nick_pass = os.environ['IRCPASS']
 
 help_text = [
         [ "addfield <field> <data>", "Sets <field> to <data>"],
@@ -350,11 +352,11 @@ class DocBot(irc.bot.SingleServerIRCBot):
 
   def on_welcome(self, c, e):
     c.join(self.channel)
+    c.privmsg('NickServ', "IDENTIFY " + nick_pass)
     c.mode(c.get_nickname(), "+B")
 
   def on_endofmotd(self, c, e):
-    print("Setting modes and names...")
-    c.mode(c.get_nickname(), "+B")
+    pass
 
   def on_privmsg(self, c, e):
     #print(e.target)
