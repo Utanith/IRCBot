@@ -156,7 +156,7 @@ def get_all_fields(nick):
   cur = con.cursor()
   uid = getUID(nick)
 
-  cur.execute("""SELECT field FROM fields WHERE user = ?""", (uid,))
+  cur.execute("""SELECT field FROM fields WHERE user = ? AND NOT (data LIKE '@%')""", (uid,))
   fields = cur.fetchall()
   con.close()
   return fields
