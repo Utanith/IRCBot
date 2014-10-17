@@ -415,19 +415,19 @@ class DocBot(irc.bot.SingleServerIRCBot):
     pass
   
   def natural_commands(self, s):
-    m = re.match("""Umbra, what do you know about (.*)\?""", s)
+    m = re.match("""Umbra\, what do you know about (.*)\?""", s)
     if m is not None:
       return "!fields {n}".format(n = m.group(1))
 
-    m = re.match("""Umbra, (who|what|where|when) is (.*)'s (.*)\?""", s)
+    m = re.match("""Umbra\, (who|what|where|when) is (.*)'s (.*)\?""", s)
     if m is not None:
       return "!fields {n} {f}".format(n = m.group(2), f = m.group(3))
  
-    m = re.match("""Umbra, remember that my (.*) is (.*).""", s)
+    m = re.match("""Umbra\, remember that my (.*) is (.*).""", s)
     if m is not None:
       return "!addfield {f} {d}".format(f = m.group(1), d = m.group(2))
 
-    m = re.match("""Umbra, introduce yourself.""", s)
+    m = re.match("""Umbra\, introduce yourself.""", s)
     if m is not None:
       return "!introduce"
 
