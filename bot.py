@@ -2,6 +2,9 @@ import irc.bot, irc.strings, hashlib, os, re, sys, math
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
+version = "1.0b"
+lastupdate = "October 16, 2014"
+
 nick_pass = os.environ['IRCPASS']
 
 help_text = [
@@ -187,7 +190,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
     "pwreset": self.reset_password,
     "addspec": self.add_spec,
     "raw": self.raw,
-    "introduce": self.introduce
+    "introduce": self.introduce,
+    "version": self.version
     }
 
   def authorized(self, e, action = "-"):
@@ -324,6 +328,9 @@ class DocBot(irc.bot.SingleServerIRCBot):
         add_spec(field, field_spec)
         self.command_reply(e, "Added {s} spec for {f}.".format(s = field_spec, f = field))
 
+  def version(self, e, args = ""):
+    self.command_reply(e, "Version {v}, last updated {d}.".format(v = version, d = lastupdate))
+
   def command_reply(self, source, msg):
     size = sys.getsizeof(msg)
     msgs = math.ceil(size / 450.0)
@@ -332,7 +339,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     target = source.target
     
     if target == c.get_nickname():
-      target = source.nick
+      target = source.source.nick
 
     for x in xrange(int(msgs)):
       start = 0 + 446*x
@@ -406,6 +413,10 @@ class DocBot(irc.bot.SingleServerIRCBot):
     m = re.match("""Umbra, introduce yourself.""", s)
     if m is not None:
       return "!introduce"
+
+    m = re.match("""Umbra: version""", s)
+    if m is not None:
+      return "!version"
 
     return s
 
