@@ -378,10 +378,11 @@ class DocBot(irc.bot.SingleServerIRCBot):
 
   def on_welcome(self, c, e):
     c.join(self.channel)
-    c.privmsg('NickServ', "IDENTIFY " + nick_pass)
     c.mode(c.get_nickname(), "+B")
 
   def on_endofmotd(self, c, e):
+    c.privmsg('NickServ', "IDENTIFY " + nick_pass)
+    print("Sent: IDENTIFY " + nick_pass)
     pass
 
   def on_privmsg(self, c, e):
@@ -399,6 +400,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
       c.privmsg(e.source.nick, "Additionally, I can respond to in character messages falling within a certain format; \"Umbra, <a> is <n>'s <f>?\" where <a> is one of who, what, when, or where. <n> is a nickname, and <f> is the piece of information you want to look up. Similarly, you can save data about yourself with a message like, \"Umbra, remember that my <f> is <d>.\" <f> is the name of the information, and <d> is the information to store. These only work in channel.")
 
   def on_notice(self, c, e):
+    print(e.arguments[0])
     pass
   
   def natural_commands(self, s):
