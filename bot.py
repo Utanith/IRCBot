@@ -7,16 +7,17 @@ lastupdate = "October 17, 2014"
 
 nick_pass = os.environ['IRCPASS']
 
-help_text = [
-        [ "addfield <field> <data>", "Sets <field> to <data>"],
-        [ "check", "Tells you whether you're logged in or not."],
-        [ "delfield [nick] <field>", "Removes <field> from yourself, if no nick is specified."],
-        [ "describe <nick>", "Shortcut for `!fields <user> description`"],
-        [ "fields <nick> [field]", "Lists <nick>'s fields, or show the value of [field] for <nick>"],
-        [ "login <password>", "Authorizes you to use !addfield (And !password if you've set one)"],
-        [ "logout", "Logs you out"],
-        [ "password <password>", "Changes your password to <password>"]
-]
+help_text = {
+         "addfield":  ["addfield <field> <data>", "Sets <field> to <data>"],
+         "check":     ["check", "Tells you whether you're logged in or not."],
+         "delfield":  ["delfield [nick] <field>", "Removes <field> from yourself, if no nick is specified."],
+         "describe":  ["describe <nick>", "Shortcut for `!fields <user> description`"],
+         "fields":    ["fields <nick> [field]", "Lists <nick>'s fields, or show the value of [field] for <nick>"],
+         "login":     ["login <password>", "Authorizes you to use !addfield (And !password if you've set one)"],
+         "logout":    ["logout", "Logs you out"],
+         "password":  ["password <password>", "Changes your password to <password>"],
+         "Data":      ["", "Fields can generally contain any text. A field that is defined as \"@<field>\" is considered an alias, and will return data from <field>" ]
+}
 
 database = "bot.sql"
 
@@ -397,11 +398,17 @@ class DocBot(irc.bot.SingleServerIRCBot):
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e)
       return
-    if "help" in e.arguments[0].split(" "):
+
+    if len(argv) > 1 and argv[0] == "help" and argv[1] in help_text:
+      item = help_text[argv[1]]
+      if item[0] == "":
+        c.privmsg(e.source.nick, item[1])
+      else:
+        c.privmsg(e.source.nick, "!{c:25} | {t}".format(c = item[0], t = item[1]))
+
+    elif "help" in e.arguments[0].split(" "):
       c.privmsg(e.source.nick, "I keep track of various snippets of information about users. All commands can be used in private message or in a channel. Commands:")
-      for h in help_text:
-        c.privmsg(e.source.nick, "!{c:25} | {t}".format(c = h[0], t = h[1]))
-      c.privmsg(e.source.nick, "Additionally, I can respond to in character messages falling within a certain format; \"Umbra, <a> is <n>'s <f>?\" where <a> is one of who, what, when, or where. <n> is a nickname, and <f> is the piece of information you want to look up. Similarly, you can save data about yourself with a message like, \"Umbra, remember that my <f> is <d>.\" <f> is the name of the information, and <d> is the information to store. These only work in channel.")
+      c.privmsg(e.source.nick, "You can ask for further help (help <topic>) on any of the following: {c}".format(c = ", ".join(help_text.keys())))
 
   def on_notice(self, c, e):
     print(e.arguments[0])
