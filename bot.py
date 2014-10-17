@@ -192,7 +192,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
 
   def authorized(self, e, action = "-"):
     nick = e.source
-    if {nick.nick, nick.host} in self.auth:
+    if (nick.nick, nick.host) in self.auth:
       if action in admin and nick.nick in admins:
         print("Authorized {u} for admin level commands.".format(u=nick.nick))
         return True
@@ -239,7 +239,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     elif self.authorized(e, "-"):
       self.command_reply(e, "You're already logged in!")
     elif check_password(nick, pw):
-      self.auth.append({nick, source.host})
+      self.auth.append((nick, source.host))
       self.command_reply(e, "Successfully logged in.")
     else:
       self.command_reply(e, "Unable to log in.")
@@ -259,7 +259,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     source = e.source 
     args = e.arguments[0]
     if self.authorized(e, "-"):
-      self.auth.remove({source.nick, source.host})
+      self.auth.remove((source.nick, source.host))
       self.command_reply(e, "You have logged out.")
     else:
       self.command_reply(e, "You aren't logged in.")
@@ -422,22 +422,22 @@ class DocBot(irc.bot.SingleServerIRCBot):
   def on_part(self, c, e):
     if e.source == self.server:
       return
-    if {e.source.nick, e.source.host} in self.auth:
-      self.auth.remove({e.source.nick, e.source.host})
+    if (e.source.nick, e.source.host) in self.auth:
+      self.auth.remove((e.source.nick, e.source.host))
       print("User {u} parted channel; destroying auth".format(u=e.source.nick))
 
   def on_disconnect(self, c, e):
     if e.source == self.server:
       return
-    if {e.source.nick, e.source.host} in self.auth:
-      self.auth.remove({e.source.nick, e.source.host})
+    if (e.source.nick, e.source.host) in self.auth:
+      self.auth.remove((e.source.nick, e.source.host))
       print("User {u} disconnected; destroying auth".format(u=e.source.nick))
 
   def on_nick(self, c, e):
     if e.source == self.server:
       return
-    if {e.source.nick, e.source.host} in self.auth:
-      self.auth.remove({e.source.nick, e.source.host})
+    if (e.source.nick, e.source.host) in self.auth:
+      self.auth.remove((e.source.nick, e.source.host))
       print("User {u} changed nick; destroying auth".format(u=e.source.nick))
       
 def main():
