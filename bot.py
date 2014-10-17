@@ -2,7 +2,7 @@ import irc.bot, irc.strings, hashlib, os, re, sys, math
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
-version = "1.1b"
+version = "1.2b"
 lastupdate = "October 17, 2014"
 
 nick_pass = os.environ['IRCPASS']
@@ -282,7 +282,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
       fields = get_all_fields(argv[1])
 
       if fields == None or fields == []:
-        self.command_reply(e, "User has no fields defined.")
+        self.command_reply(e, "I don't have any information on {n}.".format(n=argv[1]))
         return
       fields = zip(*fields)
       flist = ""
@@ -295,7 +295,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
     elif len(argv) == 3:
       output = self.field_text(argv[1], argv[2])
       if output == "":
-        self.command_reply(e, "{u} doesn't have a {f}.".format(u = argv[1], f = argv[2]))
+        self.command_reply(e, "I don't know {u}'s {f}.".format(u = argv[1], f = argv[2]))
       else:
         self.command_reply(e, output)
       
@@ -306,7 +306,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
       if update_password(source.nick, args[1]):
         self.command_reply(e, "Password changed.")
       else:
-        self.command_reply(e, "Unable to update password.")
+        self.command_reply(e, "I was unable to update your password.")
     else:
       self.command_reply(e, "You must login to change your password.")
 
@@ -416,7 +416,6 @@ class DocBot(irc.bot.SingleServerIRCBot):
     pass
   
   def natural_commands(self, s):
-    print("In natural commands")
     m = re.match("""Umbra\, what do you know about (.*)\?""", s, re.IGNORECASE)
     if m is not None:
       return "!fields {n}".format(n = m.group(1))
