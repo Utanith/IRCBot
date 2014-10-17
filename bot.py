@@ -393,6 +393,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
   def on_privmsg(self, c, e):
     #print(e.target)
     msg = e.arguments[0]
+    print(msg)
     argv = msg.split(" ", 1)
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
@@ -415,23 +416,24 @@ class DocBot(irc.bot.SingleServerIRCBot):
     pass
   
   def natural_commands(self, s):
-    m = re.match("""Umbra\, what do you know about (.*)\?""", s)
+    print("In natural commands")
+    m = re.match("""Umbra\, what do you know about (.*)\?""", s, re.IGNORECASE)
     if m is not None:
       return "!fields {n}".format(n = m.group(1))
 
-    m = re.match("""Umbra\, (who|what|where|when) is (.*)'s (.*)\?""", s)
+    m = re.match("""Umbra\, (who|what|where|when) is (.*)'s (.*)\?""", s, re.IGNORECASE)
     if m is not None:
       return "!fields {n} {f}".format(n = m.group(2), f = m.group(3))
  
-    m = re.match("""Umbra\, remember that my (.*) is (.*).""", s)
+    m = re.match("""Umbra\, remember that my (.*) is (.*).""", s, re.IGNORECASE)
     if m is not None:
       return "!addfield {f} {d}".format(f = m.group(1), d = m.group(2))
 
-    m = re.match("""Umbra\, introduce yourself.""", s)
+    m = re.match("""Umbra\, introduce yourself.""", s, re.IGNORECASE)
     if m is not None:
       return "!introduce"
 
-    m = re.match("""Umbra: version""", s)
+    m = re.match("""Umbra: version""", s, re.IGNORECASE)
     if m is not None:
       return "!version"
 
@@ -439,8 +441,9 @@ class DocBot(irc.bot.SingleServerIRCBot):
 
   def on_pubmsg(self, c, e):
     msg = self.natural_commands(e.arguments[0])
+    e.arguments[0] = msg
     argv = msg.split(" ", 1) 
-
+    
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e)
