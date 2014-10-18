@@ -224,6 +224,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
         self.command_reply(e, "I will remember that your {f} is {d}.".format(f = field[1], d = field[2]))
       else:
         self.command_reply(e, "I'm sorry, there was a probably storing that information.")
+    else:
+      self.command_reply(e, "You must login to add data to my store.")
 
   def delfield(self, e, args = ""):
     args = e.arguments[0].split(" ")
@@ -238,6 +240,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
         self.command_reply(e, "Successfully deleted field {f} on nick {n}.".format(f = args[2], n = args[1]))
       else:
         self.command_reply(e, "Unable to delete field {f} on nick {n}.".format(f = args[2], n = args[1]))
+    else:
+      self.command_reply("You must login to remove data from my store.")
 
   def login(self, e, args = ""):
     source = e.source 
