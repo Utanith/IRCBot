@@ -416,27 +416,19 @@ class DocBot(irc.bot.SingleServerIRCBot):
     pass
   
   def natural_commands(self, s):
-    m = re.match("""Umbra\, what do you know about (.+)\?""", s, re.IGNORECASE)
-    if m is not None:
-      return "!fields {n}".format(n = m.group(1))
 
-    m = re.match("""Umbra\, (who|what|where|when) is (.+)'s (.+)\?""", s, re.IGNORECASE)
-    if m is not None:
-      return "!fields {n} {f}".format(n = m.group(2), f = m.group(3))
- 
-    m = re.match("""Umbra\, remember that my (.+) is (.+)\\b""", s, re.IGNORECASE)
-    if m is not None:
-      print(m.group(2))
-      return "!addfield {f} {d}".format(f = m.group(1), d = m.group(2))
+    commands = {
+      "\, what do you know about (.+)\?":  "!fields \\1",
+      "\, (who|what|where|when) is (.+)'s (.+)\?":  "!fields \\1 \\2",
+      "\, remember that my (.+) is (.+)\\b": "!addfield \\1 \\2",
+      "\, introduce yourself.": "!introduce",
+      ": version": "!version"
+    }
 
-    m = re.match("""Umbra\, introduce yourself.""", s, re.IGNORECASE)
-    if m is not None:
-      return "!introduce"
-
-    m = re.match("""Umbra: version""", s, re.IGNORECASE)
-    if m is not None:
-      return "!version"
-
+    for r in commands.keys():
+      m = re.match(self.connection.get_nickname() + r, s, re.IGNORECASE)
+      if m is not None:
+        return m.expand(commands[r]) 
     return s
 
   def on_pubmsg(self, c, e):
