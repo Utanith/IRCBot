@@ -2,8 +2,8 @@ import irc.bot, irc.strings, hashlib, os, re, sys, math
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
-version = "1.3b"
-lastupdate = "October 17, 2014"
+version = "1.4b"
+lastupdate = "October 23, 2014"
 
 nick_pass = os.environ['IRCPASS']
 
@@ -169,11 +169,13 @@ def get_field(nick, field):
 
   cur.execute("""SELECT data FROM fields WHERE user = ? AND field = ?""", (uid,field.lower())) 
   fields = cur.fetchone()
+  if fields is None:
+    return None
+
   if fields[0][0] == "@":
     print("Translating alias")
     cur.execute("""SELECT data FROM fields WHERE user = ? AND field = ?""", (uid, fields[0][1:]))
     fields = cur.fetchone()
-    print(fields)
   con.close() 
   return fields
 
@@ -395,9 +397,10 @@ class DocBot(irc.bot.SingleServerIRCBot):
     pass
 
   def on_privmsg(self, c, e):
-    #print(e.target)
     msg = e.arguments[0]
-    print(msg)
+    e.arguments[0] = self.natural_commands(msg, True)
+    msg = e.arguments[0]   
+ 
     argv = msg.split(" ", 1)
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
@@ -419,18 +422,20 @@ class DocBot(irc.bot.SingleServerIRCBot):
     print(e.arguments[0])
     pass
   
-  def natural_commands(self, s):
-
+  def natural_commands(self, s, pm = False):
+    append = ""
+    if not pm:
+      append = self.connection.get_nickname()
     commands = {
-      "\, what do you know about (.+)\?":  "!fields \\1",
-      "\, (who|what|where|when) is (.+)'s (.+)\?":  "!fields \\1 \\2",
-      "\, remember that my (.+) is (.+)\\b": "!addfield \\1 \\2",
-      "\, introduce yourself.": "!introduce",
-      ": version": "!version"
+      "(?:\, )?what do you know about ([\\w\\b]+)\b?":  "!fields \\1",
+      "(?:\, )?(?:who|what|where|when) (?:is|are) (.+)'s ([\\w\\b]+)\??":  "!fields \\1 \\2",
+      "(?:\, )?remember that my (.+) (?:is|are) ([\@\\w\\b]+)\.?": "!addfield \\1 \\2",
+      "(?:\, )?introduce yourself[.!]?": "!introduce",
+      "(?:\: )?version": "!version"
     }
 
     for r in commands.keys():
-      m = re.match(self.connection.get_nickname() + r, s, re.IGNORECASE)
+      m = re.match(append + r, s, re.IGNORECASE)
       if m is not None:
         return m.expand(commands[r]) 
     return s
