@@ -186,20 +186,23 @@ class DocBot(irc.bot.SingleServerIRCBot):
     self.channel = chan
     self.auth = []
     self.server = server
-    self.commands = {
+    self.commands = { # Global commands
     "addfield": self.addfield,
-    "login": self.login,
     "check": self.check_auth,
     "describe": self.describe,
     "delfield": self.delfield,
     "logout": self.deauth,
     "fields": self.fields,
-    "password": self.set_password,
-    "pwreset": self.reset_password,
     "addspec": self.add_spec,
     "raw": self.raw,
     "introduce": self.introduce,
     "version": self.version
+    }
+    self.ccommands = {} # Channel-only commands
+    self.pcommands = {  # Private message-only commands
+    "login": self.login,
+    "password": self.set_password,
+    "pwreset": self.reset_password,
     }
 
   def authorized(self, e, action = "-"):
@@ -223,7 +226,7 @@ class DocBot(irc.bot.SingleServerIRCBot):
       field = args.split(" ", 2)
       nick = source.nick
       if add_field(nick, field[1], field[2]):
-        self.command_reply(e, "I will remember that your {f} is {d}.".format(f = field[1], d = field[2]))
+        self.command_reply(e, "I will remember that your {f} {c} {d}.".format(f = field[1], d = field[2], c = "is"))
       else:
         self.command_reply(e, "I'm sorry, there was a probably storing that information.")
     else:
@@ -406,6 +409,9 @@ class DocBot(irc.bot.SingleServerIRCBot):
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e)
       return
+    elif(msg[0] == "!" and command in self.pcommands):
+      self.pcommands[command](e)
+      return
 
     if len(argv) > 1 and argv[0] == "help" and argv[1] in help_text:
       item = help_text[argv[1]]
@@ -427,15 +433,16 @@ class DocBot(irc.bot.SingleServerIRCBot):
     if not pm:
       append = self.connection.get_nickname()
     commands = {
-      "(?:\, )?what do you know about ([\\w\\b]+)\b?":  "!fields \\1",
-      "(?:\, )?(?:who|what|where|when) (?:is|are) (.+)'s ([\\w\\b]+)\??":  "!fields \\1 \\2",
-      "(?:\, )?remember that my (.+) (?:is|are) ([\@\\w\\b]+)\.?": "!addfield \\1 \\2",
+      "(?:\, )?what do you know about (.+)\b?":  "!fields \\1",
+      "(?:\, )?(?:who|what|where|when) (?:is|are) (.+)'s (.+)\??":  "!fields \\1 \\2",
+      "(?:\, )?remember that my (.+) (?:is|are) (.+)\.?": "!addfield \\1 \\2",
       "(?:\, )?introduce yourself[.!]?": "!introduce",
       "(?:\: )?version": "!version"
     }
 
     for r in commands.keys():
       m = re.match(append + r, s, re.IGNORECASE)
+      print("matching {r}".format(r=r))
       if m is not None:
         return m.expand(commands[r]) 
     return s
@@ -448,7 +455,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
     command = argv[0][1:]
     if(msg[0] == "!" and command in self.commands):
       self.commands[command](e)
-      #self.do_command(e)
+    elif(msg[0] == "!" and command in self.ccommands):
+      self.ccommands[command](e)
     return
 
   def on_part(self, c, e):
