@@ -1,4 +1,4 @@
-import irc.bot, irc.strings, hashlib, os, re, sys, math
+import irc.bot, irc.strings, hashlib, os, re, sys, math, inflect
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
@@ -33,6 +33,12 @@ field_specs = {
 super_admin = ["Utanith"]
 admins = ["Utanith", "seanc", "LeoNerd"]
 admin = ["addspec", "pwreset", "admindel", "raw"]
+
+# Start the inflection engine
+inf = inflect.engine()
+
+# The nickname regex
+nnregex = "([a-zA-Z][\w\-|\[\]\{\}`^\\\]{0,29})"
 
 # Pull field specifications from the DB and reinsert them to
 # the field_specs variable
@@ -293,13 +299,8 @@ class DocBot(irc.bot.SingleServerIRCBot):
       if fields == None or fields == []:
         self.command_reply(e, "I don't have any information on {n}.".format(n=argv[1]))
         return
-      fields = zip(*fields)
-      flist = ""
-      for f in fields[0]:
-        if flist == "":
-          flist = f
-        else:
-          flist = flist + ", " + f
+      filtered_fields = [i[0] for i in fields]
+      flist = inf.join(tuple(filtered_fields))
       self.command_reply(e, "Here is what I know about {u}: {f}".format(u = argv[1], f = flist))
     elif len(argv) == 3:
       output = self.field_text(argv[1], argv[2])
@@ -433,16 +434,16 @@ class DocBot(irc.bot.SingleServerIRCBot):
     if not pm:
       append = self.connection.get_nickname()
     commands = {
-      "(?:\, )?what do you know about (.+)\b?":  "!fields \\1",
-      "(?:\, )?(?:who|what|where|when) (?:is|are) (.+)'s (.+)\??":  "!fields \\1 \\2",
+      "(?:\, )?what do you know about {n}\??".format(n=nnregex):  "!fields \\1",
+      "(?:\, )?(?:who|what|where|when) (?:is|are) (.+)'s {n}\??".format(n=nnregex):  "!fields \\1 \\2",
       "(?:\, )?remember that my (.+) (?:is|are) (.+)\.?": "!addfield \\1 \\2",
       "(?:\, )?introduce yourself[.!]?": "!introduce",
       "(?:\: )?version": "!version"
     }
 
     for r in commands.keys():
-      m = re.match(append + r, s, re.IGNORECASE)
       print("matching {r}".format(r=r))
+      m = re.match(append + r, s, re.IGNORECASE)
       if m is not None:
         return m.expand(commands[r]) 
     return s
