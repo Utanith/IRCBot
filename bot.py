@@ -2,8 +2,8 @@ import irc.bot, irc.strings, hashlib, os, re, sys, math, inflect
 import sqlite3 as sql
 from irc.client import ip_numstr_to_quad, ip_quad_to_numstr
 
-version = "1.4b"
-lastupdate = "October 23, 2014"
+version = "1.5b"
+lastupdate = "October 24, 2014"
 
 nick_pass = os.environ['IRCPASS']
 
